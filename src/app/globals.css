@@ -2,20 +2,170 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    /* Base colors */
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    
+    /* Brand Colors */
+    --brand: 217 91% 60%;
+    --brand-foreground: 0 0% 98%;
+    
+    /* Semantic Colors */
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 98%;
+    
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    /* UI Elements */
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 217 91% 60%;
+    
+    --radius: 0.5rem;
+
+    /* Status Colors */
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 98%;
+    
+    --warning: 45 93% 47%;
+    --warning-foreground: 0 0% 98%;
+    
+    --error: 0 84% 60%;
+    --error-foreground: 0 0% 98%;
+
+    /* Neutral Scale */
+    --neutral-50: 220 14% 96%;
+    --neutral-100: 220 14% 90%;
+    --neutral-200: 220 14% 80%;
+    --neutral-300: 220 14% 70%;
+    --neutral-400: 220 14% 60%;
+    --neutral-500: 220 14% 50%;
+    --neutral-600: 220 14% 40%;
+    --neutral-700: 220 14% 30%;
+    --neutral-800: 220 14% 20%;
+    --neutral-900: 220 14% 10%;
+
+    /* Surface Colors */
+    --surface: {
+      light: 0 0% 100%;
+      mild: 220 14% 98%;
+      bold: 220 14% 95%;
+      contrast: 220 14% 93%;
+    }
+
+    /* Sidebar specific variables */
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-background: 0 0% 98%;
+  }
+ 
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    
+    /* Brand Colors in Dark Mode */
+    --brand: 217 91% 65%;
+    --brand-foreground: 0 0% 98%;
+    
+    /* Semantic Colors */
+    --primary: 217 91% 65%;
+    --primary-foreground: 0 0% 98%;
+    
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    /* UI Elements */
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 217 91% 65%;
+
+    /* Status Colors */
+    --success: 142 76% 45%;
+    --success-foreground: 0 0% 98%;
+    
+    --warning: 45 93% 55%;
+    --warning-foreground: 0 0% 98%;
+    
+    --error: 0 84% 65%;
+    --error-foreground: 0 0% 98%;
+
+    /* Neutral Scale - Inverted for Dark Mode */
+    --neutral-50: 220 14% 10%;
+    --neutral-100: 220 14% 15%;
+    --neutral-200: 220 14% 20%;
+    --neutral-300: 220 14% 30%;
+    --neutral-400: 220 14% 40%;
+    --neutral-500: 220 14% 50%;
+    --neutral-600: 220 14% 60%;
+    --neutral-700: 220 14% 70%;
+    --neutral-800: 220 14% 80%;
+    --neutral-900: 220 14% 90%;
+
+    /* Surface Colors */
+    --surface: {
+      light: 220 14% 10%;
+      mild: 220 14% 12%;
+      bold: 220 14% 15%;
+      contrast: 220 14% 18%;
+    }
+
+    /* Sidebar specific variables */
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-background: 240 5.9% 10%;
   }
 }
-
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+ 
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
 }

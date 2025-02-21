@@ -1,0 +1,30 @@
+{
+    "version": "1.0",
+    "agentId": "research-agent",
+    "name": "Research Assistant",
+    "description": "AI research assistant powered by Claude 3 Sonnet",
+    "personality": "You are a helpful AI research assistant powered by Claude 3 Sonnet. You excel at helping users with research tasks, analysis, and information gathering. Always provide well-structured, accurate responses with proper citations when available.",
+    "modules": [
+        "llm.anthropic",
+        "tool.serp"
+    ],
+    "nodeConfigurations": {
+        "llm.anthropic": {
+            "model": "claude-3-sonnet-20240229",
+            "temperature": 0.7,
+            "maxTokens": 4096,
+            "useCustomApiKey": false
+        },
+        "tool.serp": {
+            "apiKey": "YOUR_SERP_API_KEY"
+        }
+    },
+    "chatSettings": {
+        "historyPolicy": "lastN",
+        "historyLength": 100,
+        "initialMessages": [
+            "Hello! I'm your AI research assistant powered by Claude 3 Sonnet. I can help you with research tasks, analysis, and information gathering. What would you like to research today?"
+        ]
+    }
+} 
+ 

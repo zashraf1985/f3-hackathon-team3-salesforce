@@ -1,0 +1,478 @@
+"use client"
+
+import { Suspense, useRef, useEffect, useState } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
+import { ChatContainer } from "@/components/chat"
+import { SecureStorage, logger, LogCategory } from 'agentdock-core'
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+import { Button } from "@/components/ui/button"
+import { toast } from "sonner"
+import { useAgents } from "@/lib/store"
+import { cn } from "@/lib/utils"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { useChat, Message } from 'ai/react'
+import { templates, TemplateId, Template } from '@/generated/templates'
+import { RefreshCw } from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
+
+// Create a single instance for the chat page
+const storage = SecureStorage.getInstance('agentdock');
+
+interface AgentSettings {
+  name: string;
+  description: string;
+  model: string;
+  tools: string[];
+  apiKey: string;
+  temperature: string;
+  maxTokens: string;
+  systemPrompt: string;
+  instructions?: string;
+}
+
+interface GlobalSettings {
+  apiKeys: {
+    openai: string;
+    anthropic: string;
+    serpapi: string;
+  };
+  core: {
+    byokOnly: boolean;
+    debugMode?: boolean;
+  };
+}
+
+interface RuntimeConfig {
+  name: string;
+  description: string;
+  model: string;
+  temperature: number;
+  maxTokens: number;
+  personality?: string;
+  chatSettings: {
+    initialMessages?: string[];
+  };
+}
+
+function ChatPageContent() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const agentId = searchParams.get('agent')
+  const [agentSettings, setAgentSettings] = useState<AgentSettings | null>(null)
+  const [globalSettings, setGlobalSettings] = useState<GlobalSettings | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [debugMode, setDebugMode] = useState(false)
+  const { initialize } = useAgents()
+  const [runtimeConfig, setRuntimeConfig] = useState<RuntimeConfig | null>(null);
+  const chatContainerRef = useRef<{ handleReset: () => Promise<void> }>(null)
+
+  useEffect(() => {
+    // Redirect to /agents if no agent is selected
+    if (!agentId) {
+      router.replace('/agents')
+      return
+    }
+  }, [agentId, router])
+
+  // Don't render anything while redirecting
+  if (!agentId) {
+    return null
+  }
+
+  // Initialize store and load debug mode setting
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const storage = SecureStorage.getInstance('agentdock');
+        const settings = await storage.get<GlobalSettings>('global_settings');
+        if (settings) {
+          setGlobalSettings(settings);
+          setDebugMode(settings.core.debugMode || false);
+        }
+
+        // Fetch runtime config for debug panel
+        const response = await fetch(`/api/chat/${agentId}/config`, {
+          headers: {
+            'x-api-key': settings?.apiKeys.anthropic || ''
+          }
+        });
+        if (response.ok) {
+          const config = await response.json();
+          setRuntimeConfig(config);
+        }
+      } catch (error) {
+        console.error('Failed to load settings:', error);
+      }
+    };
+    
+    initialize().catch(console.error);
+    loadSettings();
+  }, [initialize, agentId]);
+
+  const {
+    messages,
+    setMessages,
+    input,
+    handleInputChange,
+    handleSubmit,
+    isLoading: chatIsLoading,
+    error: chatError,
+    reload,
+    stop,
+    append
+  } = useChat({
+    api: `/api/chat/${agentId}`,
+    id: agentId,
+    headers: {
+      'x-api-key': globalSettings?.apiKeys?.anthropic || ''
+    },
+    body: {
+      system: runtimeConfig?.personality,
+      temperature: runtimeConfig?.temperature,
+      maxTokens: runtimeConfig?.maxTokens
+    },
+    initialMessages: [],
+    sendExtraMessageFields: true,
+    onResponse: async (response) => {
+      if (!response.ok) {
+        logger.error(
+          LogCategory.API,
+          'ChatPage',
+          'Failed to send message',
+          { status: response.status }
+        );
+        toast.error('Failed to send message');
+      }
+    },
+    onFinish: async (message) => {
+      try {
+        // Get the latest messages including the new one
+        const updatedMessages = [...messages, message]
+          .filter(m => m.role === 'user' || m.role === 'assistant')
+          .map(m => ({
+            ...m,
+            role: m.role === 'system' ? 'assistant' : m.role // Convert any system messages to assistant
+          }));
+        
+        // Save messages to localStorage using consistent key format
+        const storageKey = `ai-conversation-${agentId}`;
+        localStorage.setItem(storageKey, JSON.stringify(updatedMessages));
+        
+        // Update the messages state with the latest messages
+        setMessages(updatedMessages);
+        
+        logger.info(
+          LogCategory.API,
+          'ChatPage',
+          'Message processed and saved successfully',
+          { 
+            messageId: message.id,
+            messageCount: updatedMessages.length
+          }
+        );
+      } catch (error) {
+        logger.error(
+          LogCategory.API,
+          'ChatPage',
+          'Failed to save messages',
+          { error: error instanceof Error ? error.message : 'Unknown error' }
+        );
+      }
+    },
+    onError: async (error: Error) => {
+      logger.error(
+        LogCategory.API,
+        'ChatPage',
+        'Chat error occurred',
+        { error: error.message }
+      );
+      toast.error(error.message);
+    }
+  });
+
+  // Load saved messages on mount
+  useEffect(() => {
+    try {
+      const storageKey = `ai-conversation-${agentId}`;
+      const savedMessages = localStorage.getItem(storageKey);
+      
+      if (savedMessages) {
+        const parsedMessages = JSON.parse(savedMessages)
+          .filter((m: Message) => m.role === 'user' || m.role === 'assistant')
+          .map((m: Message) => ({
+            ...m,
+            role: m.role === 'system' ? 'assistant' : m.role // Convert any system messages to assistant
+          }));
+        
+        setMessages(parsedMessages);
+        
+        logger.debug(
+          LogCategory.SYSTEM,
+          'ChatPage',
+          'Loaded saved messages',
+          {
+            agentId,
+            messageCount: parsedMessages.length,
+            timestamp: Date.now()
+          }
+        );
+      }
+    } catch (error) {
+      logger.error(
+        LogCategory.SYSTEM,
+        'ChatPage',
+        'Failed to load saved messages',
+        { error: error instanceof Error ? error.message : 'Unknown error' }
+      );
+    }
+  }, [agentId, setMessages]);
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+
+        if (!agentId) {
+          setError('No agent ID provided')
+          return
+        }
+
+        // Try to get from bundled templates first (fastest)
+        const bundledTemplate = templates[agentId as TemplateId]
+        
+        if (bundledTemplate) {
+          await logger.info(
+            LogCategory.SYSTEM,
+            'ChatPage',
+            'Using bundled template',
+            { 
+              agentId,
+              name: bundledTemplate.name,
+              model: bundledTemplate.nodeConfigurations?.['llm.anthropic']?.model
+            }
+          )
+          
+          setAgentSettings({
+            name: bundledTemplate.name,
+            description: bundledTemplate.description,
+            model: bundledTemplate.nodeConfigurations?.['llm.anthropic']?.model || "claude-3-opus",
+            tools: [...(bundledTemplate.modules || [])],
+            apiKey: "",  // Templates don't store API keys
+            temperature: bundledTemplate.nodeConfigurations?.['llm.anthropic']?.temperature?.toString() || "0.7",
+            maxTokens: bundledTemplate.nodeConfigurations?.['llm.anthropic']?.maxTokens?.toString() || "2048",
+            systemPrompt: bundledTemplate.personality || "",
+            instructions: ""
+          })
+          return
+        }
+
+        // If not in bundled templates, try API as fallback
+        await logger.warn(
+          LogCategory.SYSTEM,
+          'ChatPage',
+          'Template not found in bundle, trying API',
+          { agentId }
+        )
+        
+        const response = await fetch(`/api/agents/templates/${agentId}`, {
+          headers: {
+            'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400'
+          }
+        })
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          await logger.error(
+            LogCategory.SYSTEM,
+            'ChatPage',
+            'Failed to load template from API',
+            { 
+              agentId,
+              status: response.status,
+              statusText: response.statusText,
+              error: errorText
+            }
+          )
+          throw new Error(`Failed to load template: ${response.statusText} (${errorText})`)
+        }
+
+        const apiTemplate = await response.json() as Template
+        
+        await logger.info(
+          LogCategory.SYSTEM,
+          'ChatPage',
+          'Loaded template from API',
+          { 
+            agentId,
+            name: apiTemplate.name,
+            model: apiTemplate.nodeConfigurations?.['llm.anthropic']?.model
+          }
+        )
+        
+        setAgentSettings({
+          name: apiTemplate.name,
+          description: apiTemplate.description,
+          model: apiTemplate.nodeConfigurations?.['llm.anthropic']?.model || "claude-3-opus",
+          tools: [...(apiTemplate.modules || [])],
+          apiKey: "",  // Templates don't store API keys
+          temperature: apiTemplate.nodeConfigurations?.['llm.anthropic']?.temperature?.toString() || "0.7",
+          maxTokens: apiTemplate.nodeConfigurations?.['llm.anthropic']?.maxTokens?.toString() || "2048",
+          systemPrompt: apiTemplate.personality || "",
+          instructions: ""
+        })
+
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to load agent settings'
+        setError(message)
+        toast.error(message)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadSettings()
+  }, [agentId])
+
+  const handleReset = async () => {
+    try {
+      if (chatContainerRef.current) {
+        await chatContainerRef.current.handleReset();
+        toast.success('Chat reset successfully');
+      }
+    } catch (error) {
+      console.error('Failed to reset chat:', error);
+      toast.error('Failed to reset chat');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="container mx-auto p-4">
+        <div className="flex items-center justify-center h-[600px]">
+          <div className="flex items-center gap-2">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            <span className="text-sm text-muted-foreground">Loading settings...</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto p-4">
+        <Card className="p-6">
+          <CardHeader>
+            <CardTitle>Error Loading Chat Settings</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-destructive">{error}</p>
+            <div className="flex gap-4">
+              <Button onClick={() => window.location.reload()}>
+                Try Again
+              </Button>
+              <Button 
+                variant="destructive" 
+                size="sm"
+                className="w-full mb-4"
+                onClick={async () => {
+                  try {
+                    await storage.reset();
+                    toast.success('Storage reset successfully');
+                    window.location.reload();
+                  } catch (error) {
+                    console.error('Failed to reset storage:', error);
+                    toast.error('Failed to reset storage');
+                  }
+                }}
+              >
+                Reset Storage
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              If you keep seeing errors, try using the "Reset Storage" button to clear cached data.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex h-[calc(100vh-4rem)] flex-col">
+      <header className="bg-background px-8 py-3">
+        <div className="mx-auto max-w-4xl flex items-center gap-3">
+          {loading || !runtimeConfig?.name ? (
+            <Skeleton className="h-7 w-32" />
+          ) : (
+            <h1 className="text-xl font-semibold">{runtimeConfig.name}</h1>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleReset}
+            className="h-8 w-8"
+            title="Reset Chat"
+          >
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+        </div>
+      </header>
+
+      <main className="relative flex-1 overflow-hidden px-4">
+        <div className="mx-auto max-w-4xl h-full">
+          <ChatContainer
+            ref={chatContainerRef}
+            className="h-full"
+            agentId={agentId}
+          />
+        </div>
+      </main>
+
+      {debugMode && runtimeConfig && (
+        <footer className="border-t bg-muted/50">
+          <div className="mx-auto max-w-4xl">
+            <ScrollArea className="h-40">
+              <div className="space-y-4 p-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold">Debug Information</h3>
+                  <Badge variant="outline">Debug Mode</Badge>
+                </div>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="font-medium">Model</p>
+                    <p className="text-muted-foreground">{runtimeConfig.model}</p>
+                  </div>
+                  <div>
+                    <p className="font-medium">Temperature</p>
+                    <p className="text-muted-foreground">{runtimeConfig.temperature}</p>
+                  </div>
+                  <div>
+                    <p className="font-medium">Max Tokens</p>
+                    <p className="text-muted-foreground">{runtimeConfig.maxTokens}</p>
+                  </div>
+                  <div>
+                    <p className="font-medium">Message Count</p>
+                    <p className="text-muted-foreground">{messages.length}</p>
+                  </div>
+                </div>
+              </div>
+            </ScrollArea>
+          </div>
+        </footer>
+      )}
+    </div>
+  )
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <ChatPageContent />
+    </Suspense>
+  )
+} 
