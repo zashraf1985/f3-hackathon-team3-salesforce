@@ -15,6 +15,7 @@ import { tools as snowtracerTools } from './snowtracer/index';
 import { tools as imageGenerationTools } from './image-generation';
 import { tools as cognitiveTools } from './cognitive-tools';
 import { tools as scienceTools } from './science';
+import { tools as salesforceTools } from './salesforce';
 import type { ToolCollection } from './types';
 import { logger, LogCategory } from 'agentdock-core';
 
@@ -28,7 +29,8 @@ export const allTools: ToolCollection = {
   ...snowtracerTools,
   ...imageGenerationTools,
   ...cognitiveTools,
-  ...scienceTools,
+  ...scienceTools,  
+  ...salesforceTools, // Added Salesforce node tools
   crypto_price: cryptoPriceTool,
   trending_cryptos: trendingCryptosTool
 };
@@ -175,4 +177,4 @@ export function debugToolWithLLMContext(toolName: string, context: any) {
 // - registerCustomTool(name: string, tool: unknown)
 // - unregisterCustomTool(name: string)
 // - validateCustomTool(tool: unknown)
-// - getCustomToolMetadata(name: string) 
+// - getCustomToolMetadata(name: string)
